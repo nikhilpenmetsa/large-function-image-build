@@ -1,27 +1,42 @@
 #!/bin/bash
+set -e
 
-# Get stack outputs
-stack_name="rag-eval-stack"
-codebuild_project=$(aws cloudformation describe-stacks \
-    --stack-name $stack_name \
-    --query 'Stacks[0].Outputs[?OutputKey==`CodeBuildProjectName`].OutputValue' \
-    --output text)
+# Start the build
+BUILD_ID=$(aws codebuild start-build \
+    --project-name build-rag-eval-build \
+    --output json \
+    | jq -r '.build.id')
 
-# Start build
-build_id=$(aws codebuild start-build \
-    --project-name $codebuild_project \
-    --output text \
-    --query 'build.id')
+echo "Build started with ID: $BUILD_ID"
 
-echo "Build started with ID: $build_id"
+# Optional: Wait and watch the build progress
+aws codebuild batch-get-builds --ids "$BUILD_ID" \
+    --query 'builds[0].buildStatus' \
+    --output text
 
-# Wait for build to complete
-aws codebuild wait build-completion --id $build_id
+# Optional: Stream the logs
+while true; do
+    STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" \
+        --query 'builds[0].buildStatus' \
+        --output text)
+    
+    echo "Build status: $STATUS"
+    
+    if [ "$STATUS" != "IN_PROGRESS" ]; then
+        break
+    fi
+    
+    sleep 10
+done
 
-# Get build status
-build_status=$(aws codebuild batch-get-builds \
-    --ids $build_id \
+# Check final status
+FINAL_STATUS=$(aws codebuild batch-get-builds --ids "$BUILD_ID" \
     --query 'builds[0].buildStatus' \
     --output text)
 
-echo "Build completed with status: $build_status"
+if [ "$FINAL_STATUS" != "SUCCEEDED" ]; then
+    echo "Build failed with status: $FINAL_STATUS"
+    exit 1
+fi
+
+echo "Build completed successfully"
