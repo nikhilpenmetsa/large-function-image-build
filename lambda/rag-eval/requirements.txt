@@ -1,0 +1,4 @@
+ragas
+langchain
+pandas
+numpy
