@@ -65,6 +65,7 @@ Resources:
             Value: !Ref ECRRepository
       Source:
         Type: GITHUB
+        Location: https://github.com/nikhilpenmetsa/large-function-image-build/
         BuildSpec: buildspec.yml
       Cache:
         Type: NO_CACHE
